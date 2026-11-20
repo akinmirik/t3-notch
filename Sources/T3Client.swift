@@ -134,7 +134,7 @@ final class T3Client {
                 case "Ping":
                     send(task, ["_tag": "Pong"])
                 case "Exit", "Defect", "ClientProtocolError":
-                    log("\(config.url): stream ended: \(String(data: data.prefix(300), encoding: .utf8) ?? "")")
+                    log("\(config.url): stream ended (\(m["_tag"] as? String ?? "unknown"))")
                     task.cancel(with: .goingAway, reason: nil)
                 default:
                     break

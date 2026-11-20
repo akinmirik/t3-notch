@@ -1,3 +1,7 @@
 build/
 .probe/
 .claude/
+config.json
+*.token
+.DS_Store
+__pycache__/

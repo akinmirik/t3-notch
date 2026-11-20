@@ -28,7 +28,7 @@ final class NotchController {
     private var unhideTimer: Timer?
     private var cancellables: Set<AnyCancellable> = []
 
-    static let panelHeight: CGFloat = 420
+    static let panelHeight: CGFloat = 500
 
     /// Without a screen: wide enough for the widest ten-figure pill (and the list, which spans it
     /// symmetrically) on either side.
@@ -148,7 +148,7 @@ final class NotchController {
     /// The notch and wing, plus, when expanded, the list below the menu bar. The expanded shape's
     /// top strip beside the notch is left out so menu bar items there stay clickable.
     private func isHot(_ p: NSPoint) -> Bool {
-        let running = store.runningCount, waiting = store.waitingCount
+        let running = store.runningCount, waiting = store.notchWaitingCount
         let woke = store.woke.count, done = store.done.count, read = store.read.count
         var top = toScreen(state.collapsedRect(running: running, waiting: waiting, woke: woke, done: done, read: read))
         top.size.height += 4 // past the screen edge, so the topmost pixel row counts
@@ -200,7 +200,7 @@ final class NotchController {
     private func open(_ thread: AgentThread) {
         state.expanded = false
         panel.ignoresMouseEvents = true
-        if let env = store.environments[thread.source], let url = URL(string: "t3code://threads/\(env)/\(thread.id)") {
+        if let env = store.environments[thread.source], let url = T3Link.url(environment:env,thread:thread.id) {
             NSWorkspace.shared.open(url)
         } else if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.t3tools.t3code") {
             NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())

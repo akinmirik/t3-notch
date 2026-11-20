@@ -203,6 +203,13 @@ private func parseDate(_ value: Any?) -> Date? {
 /// Threads from every configured T3 server, counted together.
 @MainActor
 final class Store: ObservableObject {
+    var onThreads: (([AgentThread], Bool, Int) -> Void)?
+    @Published private(set) var active: [AgentThread] = []
+    @Published private(set) var attention: [AgentThread] = []
+    @Published private(set) var workers: [AgentThread] = []
+    @Published private(set) var waiters: [AgentThread] = []
+    var notchWaitingCount: Int { waitingCount + attention.count }
+    var displayed: [AgentThread] { active + finished }
     @Published private(set) var runningCount = 0
     @Published private(set) var waitingCount = 0
     @Published private(set) var done: [AgentThread] = []
@@ -307,6 +314,15 @@ final class Store: ObservableObject {
         }
         let running = all.filter(\.isRunning).count
         let waiting = all.filter { $0.isWaiting(now: now) }.count
+        let sorted = all.sorted { $0.key < $1.key }
+        let raised = sorted.filter { $0.needsAttention && !$0.isUnlisted && !$0.isShelved }
+        let working = sorted.filter(\.isRunning)
+        let parked = sorted.filter { $0.isWaiting(now: now) }
+        let listed = raised + working.filter { !$0.isUnlisted && !$0.isShelved } + parked
+        if raised != attention { attention = raised }
+        if working != workers { workers = working }
+        if parked != waiters { waiters = parked }
+        if listed != active { active = listed }
         // Ties break by key, so rows don't swap under the pointer as other threads change.
         func newestFirst(_ a: (Date?, AgentThread), _ b: (Date?, AgentThread)) -> Bool {
             let x = a.0 ?? .distantPast, y = b.0 ?? .distantPast
@@ -342,6 +358,10 @@ final class Store: ObservableObject {
     /// The first snapshot on a connection replaces everything. Later snapshots are project
     /// enrichment refreshes that carry only changed projects and no threads.
     func apply(_ item: [String: Any], firstSnapshot: inout Bool, source: Int = 0) {
+        let baseline = firstSnapshot
+        defer {
+            if !firstSnapshot { onThreads?(withSubagentRequests(sources[source] ?? [:]), baseline, source) }
+        }
         func parse(_ json: [String: Any]) -> AgentThread? {
             guard var t = AgentThread(json) else { return nil }
             t.source = source

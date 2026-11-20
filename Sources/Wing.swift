@@ -24,7 +24,7 @@ private let dimGreen = NSColor(red: 0.14, green: 0.34, blue: 0.2, alpha: 1)
 /// the layer drawing so the black shape always fits its contents.
 struct WingLayout: Equatable {
     /// The groups, left to right.
-    enum Group { case running, waiting, woke, done, read }
+    enum Group: Hashable { case running, waiting, woke, done, read }
     enum Item: Equatable {
         case runner, waiter, waker, sleeper, dozer, bar, idleBar, wokeBar, restingBar, readBar
         case more(Int, Group)
@@ -150,26 +150,31 @@ struct WingLayout: Equatable {
     }
 
     /// Fills `root` (y-up, `height` tall) with the wing's layers and their animations.
-    func build(into root: CALayer, height: CGFloat) {
+    func build(into root: CALayer, height: CGFloat, identities: [Group:[String]] = [:]) {
         root.sublayers?.forEach { $0.removeFromSuperlayer() }
         var runnerIndex = 0, waiterIndex = 0, wakerIndex = 0, sleeperIndex = 0, dozerIndex = 0
         var barIndex = 0, idleIndex = 0, wokeBarIndex = 0
+        func tint(_ group:Group, _ index:Int) -> NSColor? {
+            guard let keys=identities[group], index < keys.count else { return nil }
+            let color=PetPalette.color(keys[index])
+            return group == .read ? color.blended(withFraction:0.55,of:.black) : color
+        }
         for p in items {
             switch p.item {
             case .runner:
-                root.addSublayer(Self.critter(x: p.x, height: height, group: .running, index: runnerIndex))
+                root.addSublayer(Self.critter(x: p.x, height: height, group: .running, index: runnerIndex, tint:tint(.running,runnerIndex)))
                 runnerIndex += 1
             case .waiter:
-                root.addSublayer(Self.critter(x: p.x, height: height, group: .waiting, index: waiterIndex))
+                root.addSublayer(Self.critter(x: p.x, height: height, group: .waiting, index: waiterIndex, tint:tint(.waiting,waiterIndex)))
                 waiterIndex += 1
             case .waker:
-                root.addSublayer(Self.critter(x: p.x, height: height, group: .woke, index: wakerIndex))
+                root.addSublayer(Self.critter(x: p.x, height: height, group: .woke, index: wakerIndex, tint:tint(.woke,wakerIndex)))
                 wakerIndex += 1
             case .sleeper:
-                root.addSublayer(Self.critter(x: p.x, height: height, group: .done, index: sleeperIndex))
+                root.addSublayer(Self.critter(x: p.x, height: height, group: .done, index: sleeperIndex, tint:tint(.done,sleeperIndex)))
                 sleeperIndex += 1
             case .dozer:
-                root.addSublayer(Self.critter(x: p.x, height: height, group: .read, index: dozerIndex))
+                root.addSublayer(Self.critter(x: p.x, height: height, group: .read, index: dozerIndex, tint:tint(.read,dozerIndex)))
                 dozerIndex += 1
             case .bar:
                 root.addSublayer(Self.bar(x: p.x, height: height, index: barIndex))
@@ -210,11 +215,11 @@ struct WingLayout: Equatable {
     /// - Woke: glances and blinks, and now and then nudges up a point.
     /// - Done: sleeps, breathing slowly, while a small and a big "z" float up.
     /// - Read: dozes dimly, breathing slower still.
-    private static func critter(x: CGFloat, height: CGFloat, group: Group, index: Int) -> CALayer {
+    private static func critter(x: CGFloat, height: CGFloat, group: Group, index: Int, tint:NSColor? = nil) -> CALayer {
         let size = critterSize
         let root = CALayer()
         root.frame = CGRect(x: x, y: ((height - size.height) / 2).rounded(), width: size.width, height: size.height)
-        let color = Self.color(group)
+        let color = tint ?? Self.color(group)
         let asleep = group == .done || group == .read
         // Room above the head, so what floats up there stays on screen in a short menu bar.
         let headroom = height - root.frame.maxY
@@ -440,9 +445,11 @@ struct WingLayout: Equatable {
 struct WingView: NSViewRepresentable {
     let layout: WingLayout
     let height: CGFloat
+    var identities: [WingLayout.Group:[String]] = [:]
 
     final class Host: NSView {
         var built: (WingLayout, CGFloat)?
+        var identities: [WingLayout.Group:[String]] = [:]
     }
 
     func makeNSView(context: Context) -> Host {
@@ -452,9 +459,26 @@ struct WingView: NSViewRepresentable {
     }
 
     func updateNSView(_ view: Host, context: Context) {
-        if let built = view.built, built.0 == layout, built.1 == height { return }
+        if let built = view.built, built.0 == layout, built.1 == height, view.identities == identities { return }
         view.built = (layout, height)
+        view.identities = identities
         guard let root = view.layer else { return }
-        layout.build(into: root, height: height)
+        layout.build(into: root, height: height, identities:identities)
+        root.speed = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 1
+    }
+}
+
+enum PetPalette {
+    static func color(_ key:String) -> NSColor {
+        let seed=key.utf8.reduce(UInt64(5381)) { ($0 &* 33) &+ UInt64($1) }
+        let palette:[NSColor]=[.systemTeal,.systemPurple,.systemOrange,.systemPink,.systemBlue,.systemYellow,.systemGreen]
+        return palette[Int(seed % UInt64(palette.count))]
+    }
+}
+
+extension Store {
+    var petKeys:[WingLayout.Group:[String]] {
+        [.running:workers.map(\.key), .waiting:(attention + waiters).map(\.key),
+         .woke:woke.map(\.key), .done:done.map(\.key), .read:read.map(\.key)]
     }
 }

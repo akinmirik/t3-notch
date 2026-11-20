@@ -12,5 +12,8 @@ swiftc -O -swift-version 5 \
   -o "$APP/Contents/MacOS/t3notch" \
   Sources/*.swift
 
+/usr/bin/python3 scripts/make_sounds.py "$APP/Contents/Resources"
+cp LICENSE "$APP/Contents/Resources/THIRD-PARTY-LICENSE.txt"
+
 codesign --force --sign - "$APP"
 echo "built $APP"

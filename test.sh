@@ -4,3 +4,5 @@ cd "$(dirname "$0")"
 mkdir -p build
 swiftc -swift-version 5 -target arm64-apple-macos14.0 -o build/tests Sources/Store.swift Sources/Wing.swift Tests/main.swift
 build/tests
+swiftc -swift-version 5 -target arm64-apple-macos14.0 -o build/alert-tests Sources/Store.swift Sources/Personalization.swift TestsAlerts/main.swift
+build/alert-tests

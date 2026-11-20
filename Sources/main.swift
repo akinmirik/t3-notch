@@ -1,12 +1,14 @@
 import AppKit
 import SwiftUI
+import UserNotifications
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     let store = Store()
     var clients: [T3Client] = []
     var controller: NotchController?
     var style = WingStyle.critters
+    let alerts = Alerts()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let dir = argument("--demo") {
@@ -20,6 +22,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             exit(0)
         }
         style = config.wingStyle
+        if renderDir == nil {
+            UNUserNotificationCenter.current().delegate=self
+            store.onThreads = { [weak self] rows,baseline,source in self?.alerts.receive(rows,baseline:baseline,source:source) }
+        }
         clients = config.allServers.enumerated().map { T3Client(server: $1, source: $0, store: store) }
         clients.forEach { $0.start() }
 
@@ -32,8 +38,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.show()
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
                                                           object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.clients.forEach { $0.reconnectNow() } }
+            MainActor.assumeIsolated { self?.alerts.reset(); self?.clients.forEach { $0.reconnectNow() } }
         }
+        NSWorkspace.shared.notificationCenter.addObserver(forName:NSWorkspace.willSleepNotification,object:nil,queue:.main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.alerts.reset() }
+        }
+    }
+    nonisolated func userNotificationCenter(_ center:UNUserNotificationCenter, willPresent notification:UNNotification, withCompletionHandler handler:@escaping (UNNotificationPresentationOptions)->Void) { handler([.banner]) }
+    nonisolated func userNotificationCenter(_ center:UNUserNotificationCenter, didReceive response:UNNotificationResponse, withCompletionHandler handler:@escaping ()->Void) {
+        let data=response.notification.request.content.userInfo
+        if let source=data["source"] as? Int, let thread=data["thread"] as? String {
+            Task { @MainActor in
+                if let env=self.store.environments[source], let url=T3Link.url(environment:env,thread:thread) { NSWorkspace.shared.open(url) }
+            }
+        }
+        handler()
     }
 
     /// `--render <dir>`: connect, wait for the first snapshot, write collapsed/expanded PNGs over a
@@ -85,7 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ctx.scaleBy(x: 2, y: 2)
                 ctx.translateBy(x: state.wingMinX(wing) + NotchState.wingLead, y: g.panelSize.height - g.notchHeight)
                 wingLayer(state.wingLayout(running: store.runningCount, waiting: store.waitingCount, woke: store.woke.count,
-                                           done: store.done.count, read: store.read.count), g.notchHeight).render(in: ctx)
+                                       done: store.done.count, read: store.read.count), g.notchHeight, identities:store.petKeys).render(in: ctx)
             }
             write(ctx, "\(dir)/\(expanded ? "expanded" : "collapsed").png")
         }
@@ -115,10 +134,10 @@ private func bitmap(_ w: Int, _ h: Int) -> CGContext? {
               space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
 }
 
-private func wingLayer(_ layout: WingLayout, _ height: CGFloat) -> CALayer {
+private func wingLayer(_ layout: WingLayout, _ height: CGFloat, identities:[WingLayout.Group:[String]] = [:]) -> CALayer {
     let root = CALayer()
     root.frame = CGRect(x: 0, y: 0, width: layout.width, height: height)
-    layout.build(into: root, height: height)
+    layout.build(into: root, height: height, identities:identities)
     return root
 }
 

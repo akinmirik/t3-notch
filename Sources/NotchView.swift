@@ -23,10 +23,10 @@ final class NotchState: ObservableObject {
     @Published var expanded = false
     var style: WingStyle = .critters // read from config once at launch
 
-    static let rowHeight: CGFloat = 26
+    static let rowHeight: CGFloat = 32
     static let maxRows = 12
     static let moreHeight: CGFloat = 20
-    static let footerHeight: CGFloat = 24
+    static let footerHeight: CGFloat = 32
     static let expandedWidth: CGFloat = 380
 
     init(geometry: NotchGeometry) { self.geometry = geometry }
@@ -89,7 +89,7 @@ final class NotchState: ObservableObject {
         let g = geometry
         let wing = wingWidth(running: running, waiting: waiting, woke: woke, done: done, read: read)
         if !expanded { return collapsedRect(running: running, waiting: waiting, woke: woke, done: done, read: read) }
-        let listed = woke + done + read
+        let listed = running + waiting + woke + done + read
         // Reaches left over a short wing but no further right than usual, so status items stay visible.
         let half = Self.expandedWidth / 2
         let minX = min(g.notchMidX - half, max(wingMinX(wing), g.notchMinX - Self.listReach))
@@ -152,7 +152,7 @@ struct NotchView: View {
 
     var body: some View {
         let running = store.runningCount
-        let waiting = store.waitingCount
+        let waiting = store.notchWaitingCount
         let woke = store.woke.count, done = store.done.count, read = store.read.count
         let g = state.geometry
         let rect = state.shapeRect(running: running, waiting: waiting, woke: woke, done: done, read: read)
@@ -181,7 +181,7 @@ struct NotchView: View {
                 // ImageRenderer can't draw AppKit views; `--render` composites the layers itself.
                 if renderDir == nil {
                     WingView(layout: state.wingLayout(running: running, waiting: waiting, woke: woke, done: done, read: read),
-                             height: g.notchHeight)
+                             height: g.notchHeight, identities:store.petKeys)
                 } else {
                     Color.clear
                 }
@@ -191,7 +191,7 @@ struct NotchView: View {
             .opacity(wing > 0 ? (store.connected ? 1 : 0.35) : 0)
 
             if state.expanded {
-                DoneList(store: store, done: store.finished, open: open, hide: hide, now: Date())
+                DoneList(store: store, done: store.displayed, open: open, hide: hide, now: Date())
                     .frame(width: rect.width - 20)
                     .offset(x: rect.minX + 10, y: g.notchHeight + 6)
                     .transition(.opacity)
@@ -205,6 +205,7 @@ struct NotchView: View {
 }
 
 struct DoneList: View {
+    @ObservedObject private var preferences = Preferences.shared
     @ObservedObject var store: Store
     let done: [AgentThread]
     let open: (AgentThread) -> Void
@@ -214,23 +215,29 @@ struct DoneList: View {
     var body: some View {
         VStack(spacing: 0) {
             list
-            HideButton(action: hide)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .frame(height: NotchState.footerHeight)
+            HStack(spacing:10) {
+                Text("\(store.connectedSources.count) connected").font(.system(size:9)).foregroundStyle(.secondary)
+                Button { preferences.muted.toggle() } label: { Image(systemName:preferences.muted ? "bell.slash" : "bell") }.help("Mute alerts")
+                Button { preferences.showSettings() } label: { Image(systemName:"slider.horizontal.3") }.help("Settings")
+                Spacer(minLength:0)
+                HideButton(action:hide)
+                Button { NSApp.terminate(nil) } label: { Image(systemName:"power") }.help("Quit Pulse Notch")
+            }.buttonStyle(.plain).foregroundStyle(.white.opacity(0.65)).frame(height:NotchState.footerHeight)
         }
     }
 
     @ViewBuilder private var list: some View {
         VStack(spacing: 0) {
             if done.isEmpty {
-                Text(store.connected ? "Nothing finished" : "Not connected to T3")
+                Text(store.connected ? "All quiet" : "Not connected to T3")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.4))
                     .frame(maxWidth: .infinity, minHeight: NotchState.rowHeight)
             } else {
-                ForEach(done.prefix(NotchState.maxRows), id: \.key) { t in
-                    Row(thread: t, kind: store.woke.contains(t) ? .woke : store.read.contains(t) ? .read : .done,
-                        project: store.projectName(t.projectId), now: now) { open(t) }
+                if renderDir != nil {
+                    rows(Array(done.prefix(NotchState.maxRows)))
+                } else {
+                    ScrollView { rows(done) }.frame(height:CGFloat(min(done.count,NotchState.maxRows))*NotchState.rowHeight)
                 }
                 if done.count > NotchState.maxRows {
                     Text("+\(done.count - NotchState.maxRows) more")
@@ -240,6 +247,12 @@ struct DoneList: View {
                 }
             }
         }
+    }
+    private func rows(_ threads:[AgentThread]) -> some View {
+        VStack(spacing:0) { ForEach(threads,id:\.key) { t in
+            Row(thread:t,kind:store.woke.contains(t) ? .woke : store.read.contains(t) ? .read : .done,
+                project:store.projectName(t.projectId),now:now) { open(t) }
+        } }
     }
 }
 
@@ -267,6 +280,7 @@ private struct HideButton: View {
 }
 
 private struct Row: View {
+    @ObservedObject private var preferences = Preferences.shared
     enum Kind { case woke, done, read }
     let thread: AgentThread
     let kind: Kind
@@ -276,11 +290,14 @@ private struct Row: View {
     @State private var hover = false
 
     var body: some View {
-        Button(action: action) {
+        HStack(spacing:2) { Button(action: action) {
             HStack(spacing: 7) {
                 Circle()
-                    .fill(dotColor)
+                    .fill(Color(nsColor:PetPalette.color(thread.key)))
                     .frame(width: 6, height: 6)
+                if thread.needsAttention { Image(systemName:"questionmark.circle.fill").foregroundStyle(.orange) }
+                else if thread.isRunning { Image(systemName:"circle.dotted").foregroundStyle(.cyan) }
+                else if thread.isFailed { Image(systemName:"exclamationmark.circle.fill").foregroundStyle(.red) }
                 Text(thread.title)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(kind == .read ? 0.6 : 0.92))
@@ -302,6 +319,18 @@ private struct Row: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
+        if renderDir != nil {
+            Image(systemName:"music.note").foregroundStyle(.white.opacity(0.6)).frame(width:22)
+        } else { Menu {
+            ForEach(["Glass","Wood","Air","Silent"],id:\.self) { sound in
+                Button { preferences.sounds[thread.key]=sound; preferences.play(sound) } label: {
+                    if preferences.sound(for:thread.key)==sound { Label(sound,systemImage:"checkmark") } else { Text(sound) }
+                }
+            }
+        } label: { Image(systemName:preferences.sound(for:thread.key)=="Silent" ? "speaker.slash" : "music.note") }
+        .menuStyle(.borderlessButton).fixedSize().frame(width:22).help("Sound for this chat")
+        }
+        }.help(thread.needsAttention ? "Needs your input" : thread.isRunning ? "Working" : thread.isWaiting(now:now) ? "Waiting on background work" : thread.isFailed ? "Failed" : "Reply ready")
     }
 
     // T3's sidebar: red for failed, amber for "Limited" (failed on a usage limit), green for done.

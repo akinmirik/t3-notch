@@ -1,5 +1,17 @@
 # t3-notch
 
+## Pulse Notch personal fork
+
+This fork adds per-chat Glass/Wood/Air/Silent sound preferences, grouped completion/input/error notifications, a global mute and volume settings window, and stable per-thread pet colors. Working and input-blocked chats appear in the hover list too. Clicking a row or notification opens its T3 conversation. First snapshots after launch or reconnect are silent. Existing local Pulse sound preferences migrate once. User-written titles are unchanged; the interface is English.
+
+The original native notch layout, Core Animation critters, live WebSocket transport and sidebar rules are retained. Each server needs only `orchestration:read`. No SQLite polling or SSH relay is needed. Credentials stay in the private config file, never in the repository. Prefer a bounded token lifetime (the personal installation uses 90 days); renew through T3 before expiry. Use the existing HTTPS Tailscale Serve URL for a remote server, without exposing another port.
+
+Hover the pets to open the list. Use a row's music-note menu for its sound; the footer provides mute, settings, temporary hide and quit. Enable macOS notification permission from Settings. Custom sounds obey Pulse's mute/volume; macOS Focus governs banners separately. The app starts at login through its LaunchAgent. Builds are locally ad-hoc signed, not notarized for distribution.
+
+`./test.sh` includes the upstream status/layout suite and notification-transition regression tests. `--render` checks live source connectivity and produces static layout diagnostics without starting a second visible app.
+
+Upstream: https://github.com/ytkimirti/t3-notch . Original copyright and CodeIsland attribution are preserved in LICENSE, also included in the app resources. The sections below document the upstream behavior; in this fork pet hue identifies the thread and motion/status markers communicate its state.
+
 Your [T3 Code](https://github.com/ytkimirti/t3code) agents, living in the MacBook notch.
 
 <p align="center">
