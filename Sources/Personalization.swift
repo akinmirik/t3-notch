@@ -37,6 +37,21 @@ final class Preferences: ObservableObject {
             Task { @MainActor in self.notice = granted ? "Notifications enabled" : "Allow notifications in System Settings → Notifications → Pulse Notch." }
         }
     }
+    func testNotification() {
+        play("Glass")
+        let content = UNMutableNotificationContent()
+        content.title = "Pulse Notch"
+        content.body = "Your crew is connected. This is a test notification."
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:UUID().uuidString,content:content,trigger:nil)) { error in
+            if let error { alertLog("Test notification failed: \(error.localizedDescription)") }
+        }
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            alertLog("Notification settings: authorization=\(settings.authorizationStatus.rawValue) alert=\(settings.alertSetting.rawValue)")
+            Task { @MainActor in
+                self.notice = settings.authorizationStatus == .authorized ? "Test sent. If no banner appears, check Focus and macOS notification settings." : "Notifications are not allowed yet. Use Enable macOS notifications."
+            }
+        }
+    }
     func showSettings() {
         if window == nil {
             let w = NSWindow(contentRect:NSRect(x:0,y:0,width:380,height:270),styleMask:[.titled,.closable],backing:.buffered,defer:false)
@@ -57,6 +72,7 @@ struct PreferencesView: View {
             HStack { Text("Volume"); Slider(value:$preferences.volume,in:0...1) }
             HStack { ForEach(["Glass","Wood","Air"],id:\.self) { sound in Button(sound) { preferences.play(sound) } } }
             Button("Enable macOS notifications") { preferences.permissions() }
+            Button("Test sound and notification") { preferences.testNotification() }
             Text(preferences.notice.isEmpty ? "Choose a sound for each chat using its music-note menu. Pulse Notch starts at login." : preferences.notice).font(.caption).foregroundStyle(.secondary)
         }.padding(22).frame(width:380,height:270)
     }
@@ -104,7 +120,10 @@ final class Alerts {
         content.title=batch.count>1 ? "\(batch.count) chats updated" : first.0.title
         content.body=batch.count>1 ? "Your crew has news. Open Pulse Notch to catch up." : first.1 == "wait" ? "Your agent needs you." : first.1 == "error" ? "This run hit an error." : "Your reply is ready."
         content.userInfo=["source":first.0.source,"thread":first.0.id]
-        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:UUID().uuidString,content:content,trigger:nil))
+        alertLog("Sending \(first.1) notification for \(batch.count) chat(s)")
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:UUID().uuidString,content:content,trigger:nil)) { error in
+            if let error { alertLog("Notification failed: \(error.localizedDescription)") }
+        }
     }
 }
 
@@ -121,4 +140,8 @@ enum T3Link {
         components.path="/\(environment)/\(thread)"
         return components.url
     }
+}
+
+private func alertLog(_ message: String) {
+    FileHandle.standardError.write(Data((message + "\n").utf8))
 }

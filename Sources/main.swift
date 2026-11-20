@@ -11,6 +11,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     let alerts = Alerts()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if CommandLine.arguments.contains("--enable-notifications") {
+            UNUserNotificationCenter.current().requestAuthorization(options:[.alert,.sound]) { granted,error in
+                print("notificationsAllowed=\(granted)")
+                if let error { log("Notification permission: \(error.localizedDescription)") }
+                exit(0)
+            }
+            return
+        }
+        if CommandLine.arguments.contains("--notification-status") {
+            UNUserNotificationCenter.current().getNotificationSettings { settings in
+                print("authorization=\(settings.authorizationStatus.rawValue) alert=\(settings.alertSetting.rawValue) sound=\(settings.soundSetting.rawValue)")
+                exit(0)
+            }
+            return
+        }
+        if CommandLine.arguments.contains("--test-notification") {
+            UNUserNotificationCenter.current().delegate = self
+            Preferences.shared.testNotification()
+            DispatchQueue.main.asyncAfter(deadline:.now()+5) { exit(0) }
+            return
+        }
         if let dir = argument("--demo") {
             Demo.run(to: dir)
             exit(0)
