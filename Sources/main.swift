@@ -27,9 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
         if CommandLine.arguments.contains("--test-notification") {
-            UNUserNotificationCenter.current().delegate = self
-            Preferences.shared.testNotification()
-            DispatchQueue.main.asyncAfter(deadline:.now()+5) { exit(0) }
+            DistributedNotificationCenter.default().postNotificationName(Notification.Name("com.kimirti.t3notch.test"),object:nil,userInfo:nil,deliverImmediately:true)
+            print("Test requested from the running Pulse Notch app")
+            DispatchQueue.main.asyncAfter(deadline:.now()+1) { exit(0) }
             return
         }
         if let dir = argument("--demo") {
@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         style = config.wingStyle
         if renderDir == nil {
             UNUserNotificationCenter.current().delegate=self
+            DistributedNotificationCenter.default().addObserver(self,selector:#selector(testNotification),name:Notification.Name("com.kimirti.t3notch.test"),object:nil)
             store.onThreads = { [weak self] rows,baseline,source in self?.alerts.receive(rows,baseline:baseline,source:source) }
         }
         clients = config.allServers.enumerated().map { T3Client(server: $1, source: $0, store: store) }
@@ -65,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             MainActor.assumeIsolated { self?.alerts.reset() }
         }
     }
+    @objc private func testNotification() { Preferences.shared.testNotification() }
     nonisolated func userNotificationCenter(_ center:UNUserNotificationCenter, willPresent notification:UNNotification, withCompletionHandler handler:@escaping (UNNotificationPresentationOptions)->Void) { handler([.banner]) }
     nonisolated func userNotificationCenter(_ center:UNUserNotificationCenter, didReceive response:UNNotificationResponse, withCompletionHandler handler:@escaping ()->Void) {
         let data=response.notification.request.content.userInfo

@@ -15,6 +15,7 @@ swiftc -O -swift-version 5 \
 /usr/bin/python3 scripts/make_sounds.py "$APP/Contents/Resources"
 swift scripts/make_icon.swift build/Pulse.iconset
 iconutil -c icns build/Pulse.iconset -o "$APP/Contents/Resources/Pulse.icns"
+cp build/Pulse.iconset/icon_128x128@2x.png "$APP/Contents/Resources/PulsePet.png"
 cp LICENSE "$APP/Contents/Resources/THIRD-PARTY-LICENSE.txt"
 
 codesign --force --sign - "$APP"
