@@ -14,8 +14,9 @@ final class Preferences: ObservableObject {
     private var window: NSWindow?
     init() {
         let old = UserDefaults(suiteName:"local.akin.Pulse")!
+        let previousFork = UserDefaults(suiteName:"com.kimirti.t3notch")!
         let migrated = defaults.bool(forKey:"pulseMigrated")
-        let source = migrated ? defaults : old
+        let source = migrated ? defaults : previousFork.bool(forKey:"pulseMigrated") ? previousFork : old
         muted = source.bool(forKey:"muted")
         volume = source.object(forKey:"volume") as? Double ?? 0.35
         let saved = source.dictionary(forKey:"sounds") as? [String:String] ?? [:]
@@ -42,8 +43,7 @@ final class Preferences: ObservableObject {
         let content = UNMutableNotificationContent()
         content.title = "Pulse Notch"
         content.body = "Your crew is connected. This is a test notification."
-        content.attachments = petAttachments()
-        alertLog("Sending test from running app, pet attachments=\(content.attachments.count)")
+        alertLog("Sending test from running app using its native sender icon")
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:UUID().uuidString,content:content,trigger:nil)) { error in
             if let error { alertLog("Test notification failed: \(error.localizedDescription)") }
         }
@@ -122,7 +122,6 @@ final class Alerts {
         content.title=batch.count>1 ? "\(batch.count) chats updated" : first.0.title
         content.body=batch.count>1 ? "Your crew has news. Open Pulse Notch to catch up." : first.1 == "wait" ? "Your agent needs you." : first.1 == "error" ? "This run hit an error." : "Your reply is ready."
         content.userInfo=["source":first.0.source,"thread":first.0.id]
-        content.attachments = petAttachments()
         alertLog("Sending \(first.1) notification for \(batch.count) chat(s)")
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:UUID().uuidString,content:content,trigger:nil)) { error in
             if let error { alertLog("Notification failed: \(error.localizedDescription)") }
@@ -147,19 +146,4 @@ enum T3Link {
 
 private func alertLog(_ message: String) {
     FileHandle.standardError.write(Data((message + "\n").utf8))
-}
-
-// A visible pet thumbnail independent of macOS's cached sender icon.
-private func petAttachments() -> [UNNotificationAttachment] {
-    guard let source = Bundle.main.url(forResource:"PulsePet",withExtension:"png") else { return [] }
-    let copy = FileManager.default.temporaryDirectory.appendingPathComponent("pulse-pet-\(UUID().uuidString).png")
-    do {
-        try FileManager.default.copyItem(at:source,to:copy)
-        let attachment = try UNNotificationAttachment(identifier:"pulse-pet",url:copy,options:nil)
-        return [attachment]
-    } catch {
-        try? FileManager.default.removeItem(at:copy)
-        alertLog("Pet attachment failed: \(error.localizedDescription)")
-        return []
-    }
 }

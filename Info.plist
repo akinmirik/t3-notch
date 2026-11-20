@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.kimirti.t3notch</string>
+    <string>local.akin.PulseNotch</string>
     <key>CFBundleName</key>
     <string>Pulse Notch</string>
     <key>CFBundleDisplayName</key>
@@ -17,7 +17,7 @@
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
     <key>CFBundleVersion</key>
-    <string>2</string>
+    <string>3</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSUIElement</key>

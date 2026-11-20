@@ -10,6 +10,8 @@ APP="$HOME/Applications/t3notch.app"
 mkdir -p "$HOME/Applications"
 rm -rf "$APP"
 ditto build/t3notch.app "$APP"
+# Register the finished bundle (including its icon) before the first notification.
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
 PLIST="$HOME/Library/LaunchAgents/com.kimirti.t3notch.plist"
 
 cat > "$PLIST" <<EOF

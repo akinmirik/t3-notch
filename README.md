@@ -2,6 +2,8 @@
 
 ## Pulse Notch personal fork
 
+The personal app uses bundle identifier `local.akin.PulseNotch`. Installation registers its completed icon-bearing bundle before notification use. Existing `com.kimirti.t3notch` sound preferences migrate automatically; macOS asks for notification permission once for the new identity. Alerts use the native app icon without an additional image attachment.
+
 This fork adds per-chat Glass/Wood/Air/Silent sound preferences, grouped completion/input/error notifications, a global mute and volume settings window, and stable per-thread pet colors. Working and input-blocked chats appear in the hover list too. Clicking a row or notification opens its T3 conversation. First snapshots after launch or reconnect are silent. Existing local Pulse sound preferences migrate once. User-written titles are unchanged; the interface is English.
 
 The original native notch layout, Core Animation critters, live WebSocket transport and sidebar rules are retained. Each server needs only `orchestration:read`. No SQLite polling or SSH relay is needed. Credentials stay in the private config file, never in the repository. Prefer a bounded token lifetime (the personal installation uses 90 days); renew through T3 before expiry. Use the existing HTTPS Tailscale Serve URL for a remote server, without exposing another port.
