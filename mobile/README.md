@@ -29,3 +29,23 @@ Do not log subscriptions, private keys, tokens, or complete upstream responses. 
 To stop the installed copy, verify the launcher/server PID command lines against this app before terminating them, remove only the Pulse Pocket startup shortcut, then run `tailscale serve --https=8443 off`. Leave port 443 and the T3/Apollo/Tailscale services intact. Keep the private config as a protected backup for reinstallation; deleting it requires re-pairing phones.
 
 Initial scope: host agents. Mac-local agents are not exposed or monitored by this service. The existing native Mac app continues monitoring its own two sources separately.
+
+## Conversations, quiet hours, and Blender
+
+Notifications carry the T3 web conversation URL (`/<environmentId>/<threadId>`), resolved from the live environment endpoint. Tapping a crew row or a conversation update opens the same URL. Tailscale and a valid T3 web login are required; no T3 access token is embedded in links. Old notifications retain their original destination.
+
+Quiet hours default to **00:00–08:00 Europe/Istanbul**, per phone. Edit or disable them in Pulse. Normal completions are held in a persistent bounded queue (latest 100); when the window ends, one recap is sent. Errors and requests for input bypass quiet hours. Explicit tests also bypass the schedule; the global Pause alerts button still suppresses everything. Paused devices receive any already-queued recap after resuming. Subscription refreshes preserve settings and pending updates.
+
+`blender/pulse_notify.py` is installed under the user's Blender 4.5 `scripts/startup` folder. It loads at the next **normal** Blender launch without restarting the current session. Render completion fires once per job, including animation/video renders. Cancellation is reported as cancelled, never successful. It writes small atomic envelopes to the private local `jobs` spool; the service deduplicates and consumes them. No scene settings or Blender script-execution security policy are changed. `--factory-startup` deliberately skips user startup scripts; explicitly load/register the module if a render job uses that flag.
+
+Model exporters do not share a universal completion handler. For scripted GLB/FBX/USD exports, wrap the successful synchronous operation:
+
+```python
+import pulse_notify
+with pulse_notify.export_job('Product GLB'):
+    result = bpy.ops.export_scene.gltf(filepath=output_path)
+    if 'FINISHED' not in result:
+        raise RuntimeError('Export did not finish')
+```
+
+Ordinary GUI model exports are not automatically observed. Render/video output jobs are automatic. Blender failure before any completion/cancel handler runs (for example, a process crash) cannot be reported by the hook itself.
