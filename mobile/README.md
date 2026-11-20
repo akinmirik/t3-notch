@@ -32,7 +32,7 @@ Initial scope: host agents. Mac-local agents are not exposed or monitored by thi
 
 ## Conversations, quiet hours, and Blender
 
-Notifications carry the T3 web conversation URL (`/<environmentId>/<threadId>`), resolved from the live environment endpoint. Tapping a crew row or a conversation update opens the same URL. Tailscale and a valid T3 web login are required; no T3 access token is embedded in links. Old notifications retain their original destination.
+Notifications carry T3's official Universal Link (`https://app.t3.codes/threads/<environmentId>/<threadId>`), resolved from the live environment endpoint. On a supported iPhone app build, this opens the native app's conversation; that app must already be connected to the host. No T3 access token is embedded in links. The v3 service worker also converts v2 notification host URLs to the Universal Link. Open Pulse once to install the updated worker. OS link preferences or an older T3 app can still show the official app/browser chooser; use Open in app there. Reference: https://github.com/pingdotgg/t3code/blob/main/docs/user/prompt-links.md
 
 Quiet hours default to **00:00–08:00 Europe/Istanbul**, per phone. Edit or disable them in Pulse. Normal completions are held in a persistent bounded queue (latest 100); when the window ends, one recap is sent. Errors and requests for input bypass quiet hours. Explicit tests also bypass the schedule; the global Pause alerts button still suppresses everything. Paused devices receive any already-queued recap after resuming. Subscription refreshes preserve settings and pending updates.
 

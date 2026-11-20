@@ -40,8 +40,8 @@ test('errors, questions and explicit tests bypass quiet hours',()=>{
  assert.equal(validQuiet({...defaultQuiet,start:'08:00'}),false);
 });
 test('thread URLs are encoded and require known environment',()=>{
- assert.equal(threadUrl('https://host.example','env','thread'), 'https://host.example/env/thread');
- assert.equal(threadUrl('https://host.example','env','a/b'),'https://host.example/env/a%2Fb');
+ assert.equal(threadUrl('https://host.example','env','thread'), 'https://app.t3.codes/threads/env/thread');
+ assert.equal(threadUrl('https://host.example','env','a/b'),'https://app.t3.codes/threads/env/a%2Fb');
  assert.equal(threadUrl('https://host.example',null,'thread'),null);
 });
 test('Blender job envelopes validate kind, bounded title and timestamp',()=>{
@@ -57,7 +57,11 @@ test('notification click opens its conversation instead of focusing the home scr
  const self={location:{origin:'https://akin-host.tail13abb4.ts.net:8443',hostname:'akin-host.tail13abb4.ts.net'},addEventListener:(n,f)=>handlers[n]=f,clients:{matchAll:async()=>[],openWindow:async url=>opened.push(url)}};
  vm.runInNewContext(fs.readFileSync(new URL('./public/sw.js',import.meta.url),'utf8'),{self,URL});
  handlers.notificationclick({notification:{data:{url:target},close(){}},waitUntil:p=>waited=p});await waited;
- assert.deepEqual(opened,[target]);
+ assert.deepEqual(opened,['https://app.t3.codes/threads/env/thread']);
  handlers.notificationclick({notification:{data:{url:'https://untrusted.example/'},close(){}},waitUntil:p=>waited=p});await waited;
  assert.equal(opened[1],self.location.origin+'/');
+ handlers.notificationclick({notification:{data:{url:'https://app.t3.codes/threads/env/thread'},close(){}},waitUntil:p=>waited=p});await waited;
+ assert.equal(opened[2],'https://app.t3.codes/threads/env/thread');
+ handlers.notificationclick({notification:{data:{url:'https://app.t3.codes/other'},close(){}},waitUntil:p=>waited=p});await waited;
+ assert.equal(opened[3],self.location.origin+'/');
 });

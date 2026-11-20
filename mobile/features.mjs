@@ -10,8 +10,7 @@ export function isQuiet(q=defaultQuiet,now=new Date()){
 export const shouldDefer=(kind,q,now)=>!['attention','failed','test'].includes(kind)&&isQuiet(q,now);
 export function threadUrl(origin,environment,id){
  if(!environment||!id)return null;
- const url=new URL(origin);if(!['https:','http:'].includes(url.protocol))return null;
- url.pathname='/'+encodeURIComponent(environment)+'/'+encodeURIComponent(id);url.search='';url.hash='';return url.href;
+ return 'https://app.t3.codes/threads/'+encodeURIComponent(environment)+'/'+encodeURIComponent(id);
 }
 export function validateJob(value){
  return value&&typeof value.id==='string'&&/^[a-f0-9-]{36}$/.test(value.id)&&['render_complete','render_cancel','export_complete','export_failed'].includes(value.kind)&&typeof value.title==='string'&&value.title.length>0&&value.title.length<=120&&Number.isFinite(Date.parse(value.time));

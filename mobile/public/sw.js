@@ -1,4 +1,4 @@
-const CACHE='pulse-v2';
+const CACHE='pulse-v3';
 const SHELL=['/','/style.css','/app.js','/icon-192.png','/icon-512.png','/apple-touch-icon.png','/manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
@@ -11,9 +11,21 @@ self.addEventListener('push',event=>{
  let data={};try{data=event.data?.json()||{};}catch{}
  event.waitUntil(self.registration.showNotification(data.title||'Pulse',{body:data.body||'Your crew has an update.',icon:'/icon-192.png',badge:'/icon-192.png',tag:data.tag||'pulse',data:{url:safeTarget(data.url)}}));
 });
-function safeTarget(value){try{const url=new URL(value||'/',self.location.origin);if(url.origin===self.location.origin||url.protocol==='https:'&&url.hostname===self.location.hostname&&!url.port&&!url.username&&!url.password)return url.href;}catch{}return self.location.origin+'/';}
+function safeTarget(value){
+ try{
+  const url=new URL(value||'/',self.location.origin);
+  if(url.username||url.password)return self.location.origin+'/';
+  if(url.origin===self.location.origin)return url.href;
+  if(url.origin==='https://app.t3.codes'&&/^\/threads\/[^/]+\/[^/]+\/?$/.test(url.pathname)&&!url.search&&!url.hash)return url.href;
+  // Notifications already delivered by v2 still carry the host's web route.
+  if(url.protocol==='https:'&&url.hostname===self.location.hostname&&!url.port&&/^\/[^/]+\/[^/]+$/.test(url.pathname))return 'https://app.t3.codes/threads'+url.pathname;
+ }catch{}
+ return self.location.origin+'/';
+}
 self.addEventListener('notificationclick',event=>{
  event.notification.close();
  const target=safeTarget(event.notification.data?.url);
+ // Open the Universal Link directly during the notification gesture, without async lookup.
+ if(new URL(target).origin!==self.location.origin){event.waitUntil(self.clients.openWindow(target));return;}
  event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(async clients=>{for(const client of clients)if(new URL(client.url).origin===new URL(target).origin){await client.navigate(target);return client.focus();}return self.clients.openWindow(target);}));
 });

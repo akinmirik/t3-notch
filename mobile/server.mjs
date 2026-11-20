@@ -138,7 +138,13 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/api/mute'){saved.subscriptions[device].muted=body.muted===true;persist();reply(200,{ok:true});return;}
     if(Date.now()-(lastTest.get(device)||0)<10000){reply(429,{error:'Please wait a few seconds.'});return;}
     lastTest.set(device,Date.now());
-    const ok=await sendTo(device,{title:'Pulse',body:'Your crew is connected. A little peace of mind.',kind:'test',url:'/',tag:'pulse-test'});reply(ok?200:502,{ok,error:ok?undefined:'Push was not accepted. Check pause setting and try enabling again.'});
+    let payload={title:'Pulse',body:'Your crew is connected. A little peace of mind.',kind:'test',url:'/',tag:'pulse-test'};
+    if(body.threadId){
+      const source=sources.find(s=>s.threads.has(body.threadId));
+      if(!source?.environment){reply(400,{error:'Conversation is not available.'});return;}
+      payload={...payload,title:source.threads.get(body.threadId).title,body:'Tap to open this chat in the T3 Code app.',url:threadUrl(source.publicUrl,source.environment,body.threadId)};
+    }
+    const ok=await sendTo(device,payload);reply(ok?200:502,{ok,error:ok?undefined:'Push was not accepted. Check pause setting and try enabling again.'});
   }catch{reply(400,{error:'Could not complete request'});}
 });
 server.listen(cfg.port,'127.0.0.1',()=>log(`Pulse listening on loopback:${cfg.port}`));
